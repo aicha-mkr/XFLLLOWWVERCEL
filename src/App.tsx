@@ -37,6 +37,12 @@ import { Toaster } from './components/ui/toaster';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useUser();
+  
+  // Skip authentication check if running on Vercel
+  if (import.meta.env.PROD) {
+    return <>{children}</>;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex items-center justify-center">
@@ -50,6 +56,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const PermissionRoute = ({ children, permission }: { children: React.ReactNode; permission?: string; }) => {
   const { hasPermission } = useUser();
+  
+  // Skip permission check if running on Vercel
+  if (import.meta.env.PROD) {
+    return <>{children}</>;
+  }
+
   if (permission && !hasPermission(permission as any)) {
     return <Navigate to="/" replace />;
   }
@@ -57,6 +69,52 @@ const PermissionRoute = ({ children, permission }: { children: React.ReactNode; 
 };
 
 function App() {
+  // If on Vercel (production), redirect /login to dashboard
+  if (import.meta.env.PROD) {
+    return (
+      <ProductsProvider>
+        <div className="min-h-screen bg-background font-sans antialiased">
+          <Routes>
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Index />} />
+              {/* Rest of your routes without authentication checks */}
+              <Route path="products" element={<Products />} />
+              <Route path="products/add" element={<AddProduct />} />
+              <Route path="products/edit/:id" element={<EditProduct />} />
+              <Route path="clients" element={<Clients />} />
+              <Route path="clients/add" element={<AddClient />} />
+              <Route path="clients/edit/:id" element={<EditClient />} />
+              <Route path="clients/details/:id" element={<ClientDetails />} />
+              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="suppliers/add" element={<AddSupplier />} />
+              <Route path="sales" element={<Sales />} />
+              <Route path="sales/add" element={<AddSale />} />
+              <Route path="sales/edit/:id" element={<EditSale />} />
+              <Route path="sales/:id" element={<SaleDetails />} />
+              <Route path="purchases" element={<Purchases />} />
+              <Route path="purchases/add" element={<AddPurchase />} />
+              <Route path="purchase-orders" element={<PurchaseOrders />} />
+              <Route path="purchase-orders/add" element={<AddPurchaseOrder />} />
+              <Route path="delivery-notes" element={<DeliveryNotes />} />
+              <Route path="delivery-notes/add" element={<AddDeliveryNote />} />
+              <Route path="quotes" element={<Quotes />} />
+              <Route path="quotes/add" element={<AddQuote />} />
+              <Route path="payments" element={<Payments />} />
+              <Route path="invoices" element={<Invoices />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="users" element={<UsersManagement />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <Toaster />
+        </div>
+      </ProductsProvider>
+    );
+  }
+
+  // Regular routing with authentication for development
   return (
     <ProductsProvider>
       <div className="min-h-screen bg-background font-sans antialiased">

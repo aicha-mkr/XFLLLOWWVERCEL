@@ -3,13 +3,15 @@
  */
 class DatabaseService {
   constructor() {
-    this.isElectron = !!(window?.electronAPI);
+    // Fix environment detection
+    this.isElectron = typeof window !== 'undefined' && window?.electronAPI?.dbQuery !== undefined;
     console.info(this.isElectron ? 'Mode Electron: Utilisation de SQLite3 avec l\'API native.' : 'Mode Web: Utilisation du localStorage.');
     this.ready = false;
     this.initPromise = null;
     
-    // Initialize default admin in web mode if no users exist
+    // Initialize default data in web mode if not exists
     if (!this.isElectron) {
+      // Initialize users with default admin
       const users = this._getFromStorage('users', []);
       if (users.length === 0) {
         const defaultAdmin = {
@@ -23,9 +25,18 @@ class DatabaseService {
           active: true,
           createdAt: new Date().toISOString()
         };
-        users.push(defaultAdmin);
-        this._saveToStorage('users', users);
+        this._saveToStorage('users', [defaultAdmin]);
       }
+
+      // Initialize other collections
+      if (!this._getFromStorage('products', null)) this._saveToStorage('products', []);
+      if (!this._getFromStorage('sales', null)) this._saveToStorage('sales', []);
+      if (!this._getFromStorage('purchases', null)) this._saveToStorage('purchases', []);
+      if (!this._getFromStorage('clients', null)) this._saveToStorage('clients', []);
+      if (!this._getFromStorage('suppliers', null)) this._saveToStorage('suppliers', []);
+      if (!this._getFromStorage('quotes', null)) this._saveToStorage('quotes', []);
+      if (!this._getFromStorage('delivery_notes', null)) this._saveToStorage('delivery_notes', []);
+      if (!this._getFromStorage('purchase_orders', null)) this._saveToStorage('purchase_orders', []);
     }
   }
 
@@ -67,72 +78,6 @@ class DatabaseService {
     }
   }
 
-  // Méthodes pour les devis
-  async getQuotes() {
-    try {
-      console.log('Loading quotes...');
-      if (this.isElectron) {
-        const quotes = await window.electronAPI.dbQuery('SELECT * FROM quotes ORDER BY date DESC');
-        return quotes.map(quote => ({
-          ...quote,
-          date: new Date(quote.date),
-          validUntil: new Date(quote.validUntil),
-          items: typeof quote.items === 'string' && quote.items.trim().startsWith('[') ? JSON.parse(quote.items) : []
-        }));
-      } else {
-        return this._getFromStorage('quotes', []).map(quote => ({
-          ...quote,
-          date: new Date(quote.date),
-          validUntil: new Date(quote.validUntil)
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading quotes:', error);
-      return [];
-    }
-  }
-
-  async createQuote(quoteData) {
-    try {
-      console.log('Creating quote:', quoteData);
-      const id = quoteData.id || Math.random().toString(36).substring(2, 9);
-      const newQuote = { ...quoteData, id };
-      
-      if (this.isElectron) {
-        await window.electronAPI.dbRun(
-          `INSERT INTO quotes (
-            id, reference, clientId, clientName, totalHT, totalTVA, totalTTC, 
-            validUntil, status, date, items
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            id,
-            quoteData.reference,
-            quoteData.clientId,
-            quoteData.clientName,
-            quoteData.totalHT,
-            quoteData.totalTVA,
-            quoteData.totalTTC,
-            quoteData.validUntil.toISOString(),
-            quoteData.status,
-            quoteData.date.toISOString(),
-            JSON.stringify(quoteData.items || [])
-          ]
-        );
-      } else {
-        const quotes = this._getFromStorage('quotes', []);
-        quotes.push(newQuote);
-        this._saveToStorage('quotes', quotes);
-      }
-      
-      return newQuote;
-    } catch (error) {
-      console.error('Error creating quote:', error);
-      throw error;
-    }
-  }
-
-  // Add similar web storage handling for all other methods...
-  
   // Products
   async getProducts() {
     try {
@@ -148,51 +93,142 @@ class DatabaseService {
     }
   }
 
-  async createProduct(productData) {
+  // Sales
+  async getSales() {
     try {
-      const id = productData.id || Math.random().toString(36).substring(2, 9);
-      const newProduct = { ...productData, id };
-      
+      console.log('Loading sales...');
       if (this.isElectron) {
-        await window.electronAPI.dbRun(
-          `INSERT INTO products (
-            id, name, description, reference, category, purchasePrice, sellingPrice,
-            stock, minStock, maxStock, unit, barcode, supplier, location, notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            id,
-            productData.name,
-            productData.description || '',
-            productData.reference || '',
-            productData.category || '',
-            productData.purchasePrice || 0,
-            productData.sellingPrice || 0,
-            productData.stock || 0,
-            productData.minStock || 0,
-            productData.maxStock || 0,
-            productData.unit || '',
-            productData.barcode || '',
-            productData.supplier || '',
-            productData.location || '',
-            productData.notes || ''
-          ]
-        );
+        const sales = await window.electronAPI.dbQuery('SELECT * FROM sales ORDER BY date DESC');
+        return sales.map(sale => ({
+          ...sale,
+          date: new Date(sale.date),
+          items: typeof sale.items === 'string' ? JSON.parse(sale.items) : []
+        }));
       } else {
-        const products = this._getFromStorage('products', []);
-        products.push(newProduct);
-        this._saveToStorage('products', products);
+        return this._getFromStorage('sales', []).map(sale => ({
+          ...sale,
+          date: new Date(sale.date)
+        }));
       }
-      
-      return newProduct;
     } catch (error) {
-      console.error('Error creating product:', error);
-      throw error;
+      console.error('Error loading sales:', error);
+      return [];
+    }
+  }
+
+  // Purchases
+  async getPurchases() {
+    try {
+      console.log('Loading purchases...');
+      if (this.isElectron) {
+        const purchases = await window.electronAPI.dbQuery('SELECT * FROM purchases');
+        return purchases.map(p => ({
+          ...p,
+          date: new Date(p.date),
+          items: p.items ? JSON.parse(p.items) : []
+        }));
+      } else {
+        return this._getFromStorage('purchases', []).map(p => ({
+          ...p,
+          date: new Date(p.date)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading purchases:', error);
+      return [];
+    }
+  }
+
+  // Clients
+  async getClients() {
+    try {
+      console.log('Loading clients...');
+      if (this.isElectron) {
+        return await window.electronAPI.dbQuery('SELECT * FROM clients');
+      } else {
+        return this._getFromStorage('clients', []);
+      }
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      return [];
+    }
+  }
+
+  // Purchase Orders
+  async getPurchaseOrders() {
+    try {
+      console.log('Loading purchase orders...');
+      if (this.isElectron) {
+        const orders = await window.electronAPI.dbQuery('SELECT * FROM purchase_orders ORDER BY date DESC');
+        return orders.map(order => ({
+          ...order,
+          date: new Date(order.date),
+          items: typeof order.items === 'string' ? JSON.parse(order.items) : []
+        }));
+      } else {
+        return this._getFromStorage('purchase_orders', []).map(order => ({
+          ...order,
+          date: new Date(order.date)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading purchase orders:', error);
+      return [];
+    }
+  }
+
+  // Delivery Notes
+  async getDeliveryNotes() {
+    try {
+      console.log('Loading delivery notes...');
+      if (this.isElectron) {
+        const notes = await window.electronAPI.dbQuery('SELECT * FROM delivery_notes ORDER BY date DESC');
+        return notes.map(note => ({
+          ...note,
+          date: new Date(note.date),
+          items: typeof note.items === 'string' ? JSON.parse(note.items) : []
+        }));
+      } else {
+        return this._getFromStorage('delivery_notes', []).map(note => ({
+          ...note,
+          date: new Date(note.date)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading delivery notes:', error);
+      return [];
+    }
+  }
+
+  // Quotes
+  async getQuotes() {
+    try {
+      console.log('Loading quotes...');
+      if (this.isElectron) {
+        const quotes = await window.electronAPI.dbQuery('SELECT * FROM quotes ORDER BY date DESC');
+        return quotes.map(quote => ({
+          ...quote,
+          date: new Date(quote.date),
+          validUntil: new Date(quote.validUntil),
+          items: typeof quote.items === 'string' ? JSON.parse(quote.items) : []
+        }));
+      } else {
+        return this._getFromStorage('quotes', []).map(quote => ({
+          ...quote,
+          date: new Date(quote.date),
+          validUntil: new Date(quote.validUntil)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading quotes:', error);
+      return [];
     }
   }
 
   // Users
   async getUsers() {
     try {
+      console.log('Loading users...');
       if (this.isElectron) {
         return await window.electronAPI.dbQuery('SELECT * FROM users');
       } else {
@@ -204,30 +240,20 @@ class DatabaseService {
     }
   }
 
-  async createUser(userData) {
+  async getUserByUsername(username) {
     try {
-      const id = userData.id || Math.random().toString(36).substring(2, 9);
-      const newUser = { ...userData, id };
-      
+      console.log('Finding user by username:', username);
       if (this.isElectron) {
-        await window.electronAPI.dbRun(
-          'INSERT INTO users (id, username, email, passwordHash, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-          [id, userData.username, userData.email, userData.passwordHash, userData.role, userData.active]
-        );
+        return await window.electronAPI.dbGet('SELECT * FROM users WHERE username = ?', [username]);
       } else {
         const users = this._getFromStorage('users', []);
-        users.push(newUser);
-        this._saveToStorage('users', users);
+        return users.find(u => u.username.toLowerCase() === username.toLowerCase()) || null;
       }
-      
-      return newUser;
     } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
+      console.error('Error finding user:', error);
+      return null;
     }
   }
-
-  // Add similar implementations for other methods...
 }
 
 // Export a singleton instance

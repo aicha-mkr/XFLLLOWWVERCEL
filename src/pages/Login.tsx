@@ -21,8 +21,13 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect to dashboard if in production
   useEffect(() => {
+    if (import.meta.env.PROD) {
+      navigate("/", { replace: true });
+      return;
+    }
+
     if (!authLoading && isAuthenticated) {
       navigate("/", { replace: true });
     }
@@ -60,6 +65,11 @@ const Login = () => {
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
+  }
+
+  // Skip rendering login form in production
+  if (import.meta.env.PROD) {
+    return null;
   }
 
   return (
