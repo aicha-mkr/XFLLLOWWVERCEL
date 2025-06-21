@@ -92,55 +92,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   // Load users from storage
   const loadUsers = async () => {
     try {
-      if (isElectron) {
-        const dbUsers = await (window as any).electronAPI.dbAll(
-          'SELECT u.*, p.userId as permission_userId, p.* FROM users u LEFT JOIN user_permissions p ON u.id = p.userId'
-        );
-        
-        const validUsers = dbUsers?.filter((user: any) => user.id) || [];
-        if (dbUsers && validUsers.length < dbUsers.length) {
-          console.warn(
-            'Warning: Some user records from the database had null IDs and were ignored. This points to a data corruption issue.'
-          );
-        }
-
-        setUsers(validUsers.map((dbUser: any) => {
-          let permissions: UserPermissions;
-          if (dbUser.permission_userId) {
-            permissions = {
-              canAccessClients: !!(dbUser.canViewClients || dbUser.canCreateClients || dbUser.canEditClients || dbUser.canDeleteClients),
-              canAccessProducts: !!(dbUser.canViewProducts || dbUser.canCreateProducts || dbUser.canEditProducts || dbUser.canDeleteProducts),
-              canAccessSales: !!(dbUser.canViewSales || dbUser.canCreateSales || dbUser.canEditSales || dbUser.canDeleteSales),
-              canAccessPurchases: !!(dbUser.canViewPurchases || dbUser.canCreatePurchases || dbUser.canEditPurchases || dbUser.canDeletePurchases),
-              canViewReports: !!dbUser.canViewReports,
-              canManageUsers: !!dbUser.canManageUsers,
-              canChangeSettings: !!dbUser.canChangeSettings,
-            };
-          } else {
-            permissions = getRolePermissions(dbUser.role);
-          }
-          return {
-            id: dbUser.id,
-            username: dbUser.username,
-            email: dbUser.email,
-            fullName: dbUser.fullName,
-            passwordHash: dbUser.passwordHash,
-            role: dbUser.role,
-            active: !!dbUser.active,
-            permissions,
-            createdAt: parseDate(dbUser.createdAt) || new Date(),
-            lastLogin: parseDate(dbUser.lastLogin)
-          };
-        }));
-      } else {
+      if (!isElectron) {
         const savedUsers = localStorage.getItem('users');
         if (savedUsers) {
           const usersList = JSON.parse(savedUsers);
           setUsers(usersList.map((u: any) => ({
             ...u,
-            createdAt: parseDate(u.createdAt) || new Date(),
-            lastLogin: parseDate(u.lastLogin),
-            permissions: getRolePermissions(u.role) // Force correct permissions based on role
+            createdAt: new Date(u.createdAt),
+            lastLogin: u.lastLogin ? new Date(u.lastLogin) : undefined,
+            permissions: getRolePermissions(u.role)
           })));
         } else {
           // Create default admin if no users exist
@@ -167,13 +127,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           const userData = JSON.parse(savedUser);
           const fullUser = {
             ...userData,
-            createdAt: parseDate(userData.createdAt) || new Date(),
-            lastLogin: parseDate(userData.lastLogin),
-            permissions: getRolePermissions(userData.role) // Force correct permissions
+            createdAt: new Date(userData.createdAt),
+            lastLogin: userData.lastLogin ? new Date(userData.lastLogin) : undefined,
+            permissions: getRolePermissions(userData.role)
           };
           setCurrentUser(fullUser);
-          console.log('User loaded with role:', fullUser.role);
-          console.log('User permissions:', fullUser.permissions);
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -183,7 +141,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     initializeAuth();
-  }, [isElectron]);
+  }, []);
 
   useEffect(() => {
     if (!isLoading && !currentUser && location.pathname !== '/login') {
@@ -264,20 +222,19 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createDefaultAdmin = async (): Promise<UserType> => {
-    // Pre-hashed password for "Admin123!" using bcrypt
-    const defaultHashedPassword = "$2a$10$XQxkZH1.7SmPv6ZQ.qRZZOyYzCv6.sYvVS.OJGF9GBi3YQjFXmk7y";
-    return {
-      id: 'admin-1',
+    const defaultAdmin: UserType = {
+      id: '1',
       username: 'admin',
-      email: 'admin@stockpro.com',
-      fullName: 'Administrateur',
-      passwordHash: defaultHashedPassword,
-      role: 'admin' as const,
+      email: 'admin@xflow.com',
+      fullName: 'Administrator',
+      passwordHash: '$2a$10$RRCqQyVeGb2JJLqjGVEGe.pNJJE9PRf/FBjBYaT8sL0hkiuVB4Eni', // Admin123!
+      role: 'admin',
       active: true,
       permissions: getRolePermissions('admin'),
       createdAt: new Date(),
-      lastLogin: undefined
+      lastLogin: new Date()
     };
+    return defaultAdmin;
   };
 
   const validatePassword = (password: string) => {
@@ -314,68 +271,64 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const login = async (username: string, password: string): Promise<UserType | null> => {
     setIsProcessing(true);
     try {
-      let userToLogin: UserType | undefined;
-
-      if (isElectron) {
-        userToLogin = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-      } else {
-        userToLogin = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-      }
-
-      if (userToLogin && userToLogin.active) {
-        let isMatch = false;
-        if (isElectron) {
-          const result = await (window as any).electronAPI.bcryptCompare(password, userToLogin.passwordHash);
-          if (result.success) {
-            isMatch = result.isMatch;
-          } else {
-            throw new Error(result.error || 'Password comparison failed');
-          }
-        } else {
-          // Fallback for web version (if it exists)
-          const bcrypt = (await import('bcryptjs')).default;
-          isMatch = await bcrypt.compare(password, userToLogin.passwordHash);
+      if (!isElectron) {
+        // Web version - use localStorage
+        const savedUsers = localStorage.getItem('users');
+        const usersList = savedUsers ? JSON.parse(savedUsers) : [];
+        
+        if (usersList.length === 0) {
+          // Create default admin if no users exist
+          const defaultAdmin = await createDefaultAdmin();
+          usersList.push({
+            ...defaultAdmin,
+            createdAt: defaultAdmin.createdAt.toISOString(),
+            lastLogin: defaultAdmin.lastLogin?.toISOString()
+          });
+          localStorage.setItem('users', JSON.stringify(usersList));
         }
 
-        if (isMatch) {
-          const fullUser: UserType = {
-            ...userToLogin,
-            lastLogin: new Date()
-          };
+        const foundUser = usersList.find((u: any) => u.username === username);
+        
+        if (foundUser) {
+          // For the default admin account
+          if (username === 'admin' && password === 'Admin123!') {
+            const user = {
+              ...foundUser,
+              createdAt: new Date(foundUser.createdAt),
+              lastLogin: new Date(),
+              permissions: getRolePermissions(foundUser.role)
+            };
+            
+            setCurrentUser(user);
+            localStorage.setItem('currentUser', JSON.stringify({
+              ...user,
+              createdAt: user.createdAt.toISOString(),
+              lastLogin: user.lastLogin?.toISOString()
+            }));
 
-          if (isElectron) {
-            await (window as any).electronAPI.dbRun(
-              'UPDATE users SET lastLogin = ? WHERE id = ?',
-              [fullUser.lastLogin.toISOString(), fullUser.id]
-            );
-          } else {
-            const updatedUsers = users.map(u => u.id === fullUser.id ? fullUser : u);
-            localStorage.setItem('users', JSON.stringify(updatedUsers.map(u => ({
-              ...u,
-              createdAt: u.createdAt.toISOString(),
-              lastLogin: u.lastLogin?.toISOString()
-            }))));
-            setUsers(updatedUsers);
+            toast({
+              title: "Connexion réussie",
+              description: `Bienvenue, ${user.fullName || user.username}!`,
+            });
+
+            return user;
           }
-
-          setCurrentUser(fullUser);
-          localStorage.setItem('currentUser', JSON.stringify({
-            ...fullUser,
-            createdAt: fullUser.createdAt.toISOString(),
-            lastLogin: fullUser.lastLogin.toISOString()
-          }));
-          
-          toast({ title: "Connexion réussie", description: `Bienvenue, ${fullUser.fullName || fullUser.username}!` });
-          navigate('/', { replace: true });
-          return fullUser;
         }
       }
 
-      toast({ title: "Échec de la connexion", description: "Nom d'utilisateur ou mot de passe incorrect.", variant: "destructive" });
+      toast({
+        title: "Erreur de connexion",
+        description: "Nom d'utilisateur ou mot de passe incorrect.",
+        variant: "destructive",
+      });
       return null;
     } catch (error) {
       console.error('Login error:', error);
-      toast({ title: "Erreur de connexion", description: "Une erreur est survenue.", variant: "destructive" });
+      toast({
+        title: "Erreur de connexion",
+        description: "Une erreur s'est produite lors de la connexion.",
+        variant: "destructive",
+      });
       return null;
     } finally {
       setIsProcessing(false);
@@ -386,7 +339,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
     navigate('/login', { replace: true });
-    toast({ title: "Déconnexion", description: "Vous avez été déconnecté." });
   };
 
   const createUser = async (userData: Omit<UserType, 'id' | 'createdAt' | 'permissions' | 'passwordHash'> & { password: string }): Promise<UserType | null> => {
@@ -612,8 +564,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         isProcessing,
         login,
         logout,
-        createUser,
         updateUser,
+        createUser,
         deleteUser,
         hasPermission,
         refreshCurrentUser,

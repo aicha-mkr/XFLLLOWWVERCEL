@@ -1,7 +1,11 @@
 /**
  * Service de base de données pour l'intégration avec SQLite (Electron) ou localStorage (Web)
  */
-class DatabaseService {
+export class DatabaseService {
+  private isElectron: boolean;
+  private ready: boolean;
+  private initPromise: Promise<void> | null;
+
   constructor() {
     // Fix environment detection
     this.isElectron = typeof window !== 'undefined' && window?.electronAPI?.dbQuery !== undefined;
@@ -257,4 +261,4 @@ class DatabaseService {
 }
 
 // Export a singleton instance
-export default new DatabaseService();
+export const dbService = new DatabaseService();
