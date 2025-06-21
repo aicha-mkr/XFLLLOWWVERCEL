@@ -1,8 +1,6 @@
-
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import LayoutHeader from "./LayoutHeader";
-import { useCompanySettings } from "@/contexts/CompanySettingsContext";
 import { memo } from "react";
 
 const Layout = memo(() => {

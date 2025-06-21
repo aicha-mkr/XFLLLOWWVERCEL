@@ -29,6 +29,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
                       <PurchasesProvider>
                         <SalesProvider>
                           <App />
+                          <Toaster />
                         </SalesProvider>
                       </PurchasesProvider>
                     </PurchaseOrdersProvider>
@@ -38,7 +39,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
             </ProductsProvider>
           </CurrencyProvider>
         </CompanySettingsProvider>
-        <Toaster />
       </UserProvider>
     </Router>
   </React.StrictMode>

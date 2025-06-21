@@ -112,18 +112,8 @@ const Sidebar = () => {
     },
   ], []);
 
-  // Optimize filtered nav items with useMemo
-  const filteredNavItems = useMemo(() => {
-    return navItems.filter(item => {
-      if (user?.role === 'admin') {
-        return true;
-      }
-      
-      if (!item.permission) return true;
-      
-      return hasPermission(item.permission as any);
-    });
-  }, [navItems, user?.role, hasPermission]);
+  // Show all items since we're not using authentication
+  const filteredNavItems = navItems;
 
   const handleNavigation = (href: string) => {
     navigate(href);
