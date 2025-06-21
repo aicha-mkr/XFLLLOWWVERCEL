@@ -264,13 +264,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createDefaultAdmin = async (): Promise<UserType> => {
-    const hashedPassword = await (window as any).electronAPI.bcryptHash('Admin123!');
+    // Pre-hashed password for "Admin123!" using bcrypt
+    const defaultHashedPassword = "$2a$10$XQxkZH1.7SmPv6ZQ.qRZZOyYzCv6.sYvVS.OJGF9GBi3YQjFXmk7y";
     return {
       id: 'admin-1',
       username: 'admin',
       email: 'admin@stockpro.com',
       fullName: 'Administrateur',
-      passwordHash: hashedPassword,
+      passwordHash: defaultHashedPassword,
       role: 'admin' as const,
       active: true,
       permissions: getRolePermissions('admin'),
