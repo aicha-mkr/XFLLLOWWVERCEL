@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
+build/
+release/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Project specific
+electron/
+installateurs_clients/
+tools/
+client_packages/
+installer/
+license-system/
+python-scripts/
+*.exe
+*.dll
+*.pak
+*.dat
+*.asar
+*.blockmap
+locales/
+resources/
